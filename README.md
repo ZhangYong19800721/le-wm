@@ -38,18 +38,36 @@ uv pip install stable-worldmodel[train,env]
 
 ## Data
 
-Datasets use the HDF5 format for fast loading. Download the data from [HuggingFace](https://huggingface.co/collections/quentinll/lewm) and decompress with:
+The training configs use Lance datasets. `stable-worldmodel` resolves dataset
+names under `$STABLEWM_HOME/datasets`; `STABLEWM_HOME` defaults to
+`~/.stable_worldmodel` when it is not set.
 
 ```bash
-tar --zstd -xvf archive.tar.zst
+export STABLEWM_HOME="${STABLEWM_HOME:-$HOME/.stable_worldmodel}"
+mkdir -p "$STABLEWM_HOME/datasets"
 ```
 
-Place the extracted `.h5` files under `$STABLEWM_HOME` (defaults to `~/.stable-wm/`). You can override this path:
+Download the Push-T Lance dataset from
+[`galilai-group/lewm-pusht`](https://huggingface.co/datasets/galilai-group/lewm-pusht):
+
 ```bash
-export STABLEWM_HOME=/path/to/your/storage
+hf download \
+  galilai-group/lewm-pusht \
+  pusht_expert_train.lance/ \
+  --repo-type dataset \
+  --local-dir "$STABLEWM_HOME/datasets"
 ```
 
-Dataset names are specified without the `.h5` extension. For example, `config/train/data/pusht.yaml` references `pusht_expert_train`, which resolves to `$STABLEWM_HOME/pusht_expert_train.h5`.
+Keep the trailing `/` in `pusht_expert_train.lance/`; it tells the Hugging Face
+CLI to download the complete Lance directory. The final layout must be:
+
+```text
+$STABLEWM_HOME/datasets/pusht_expert_train.lance/
+```
+
+The older [`quentinll/lewm-pusht`](https://huggingface.co/datasets/quentinll/lewm-pusht)
+mirror contains `pusht_expert_train.h5.zst`. That HDF5 artifact is not used by
+the current default training config, which requests `pusht_expert_train.lance`.
 
 ## Training
 

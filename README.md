@@ -51,11 +51,7 @@ Download the Push-T Lance dataset from
 [`galilai-group/lewm-pusht`](https://huggingface.co/datasets/galilai-group/lewm-pusht):
 
 ```bash
-hf download \
-  galilai-group/lewm-pusht \
-  pusht_expert_train.lance/ \
-  --repo-type dataset \
-  --local-dir "$STABLEWM_HOME/datasets"
+hf download galilai-group/lewm-pusht pusht_expert_train.lance/ --repo-type dataset --local-dir "$STABLEWM_HOME/datasets"
 ```
 
 Keep the trailing `/` in `pusht_expert_train.lance/`; it tells the Hugging Face

@@ -32,29 +32,38 @@ def img_transform(cfg):
     return transform
 
 
-def get_episodes_length(dataset, episodes):
-    # 同时兼容新旧数据集中的回合索引列名。
-    col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
+def sample_eval_starts(episode_lengths, goal_offset_steps, num_eval, seed):
+    """Uniformly sample valid ``(episode, start_step)`` pairs."""
+    episode_lengths = np.asarray(episode_lengths, dtype=np.int64)
+    valid_counts = np.maximum(episode_lengths - goal_offset_steps, 0)
+    num_valid = int(valid_counts.sum())
 
-    # 每个回合的长度等于其最大步骤编号加一。
-    episode_idx = dataset.get_col_data(col_name)
-    step_idx = dataset.get_col_data("step_idx")
-    lengths = []
-    for ep_id in episodes:
-        lengths.append(np.max(step_idx[episode_idx == ep_id]) + 1)
-    return np.array(lengths)
+    if num_valid < num_eval:
+        raise ValueError(
+            f"Not enough valid starting points: requested {num_eval}, "
+            f"but only {num_valid} are available."
+        )
+
+    # Sample flat valid-start IDs, then map them back to episode-local steps.
+    rng = np.random.default_rng(seed)
+    selected = np.sort(rng.choice(num_valid, size=num_eval, replace=False))
+    cumulative_counts = np.cumsum(valid_counts)
+    episodes = np.searchsorted(cumulative_counts, selected, side="right")
+    previous_counts = np.where(
+        episodes == 0, 0, cumulative_counts[episodes - 1]
+    )
+    starts = selected - previous_counts
+    return episodes, starts
 
 
 def get_dataset(cfg, dataset_name):
-    # 优先使用配置中的缓存目录，否则退回 stable_worldmodel 的默认目录。
-    dataset_path = Path(cfg.cache_dir or swm.data.utils.get_cache_dir())
-    # 仅缓存配置指定的列，以控制内存与磁盘开销。
-    dataset = swm.data.HDF5Dataset(
+    # 根据磁盘格式选择读取器；当前训练与评估数据使用 Lance。
+    return swm.data.load_dataset(
         dataset_name,
         keys_to_cache=cfg.dataset.keys_to_cache,
-        cache_dir=dataset_path,
+        cache_dir=cfg.cache_dir,
     )
-    return dataset
+
 
 @hydra.main(version_base=None, config_path="./config/eval", config_name="pusht")
 def run(cfg: DictConfig):
@@ -79,9 +88,6 @@ def run(cfg: DictConfig):
     # 读取评估数据，并用完整统计数据拟合各数值列的标准化器。
     dataset = get_dataset(cfg, cfg.eval.dataset_name)
     stats_dataset = dataset  # get_dataset(cfg, cfg.dataset.stats)
-    # 提取数据集中所有不重复的回合编号。
-    col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
-    ep_indices, _ = np.unique(stats_dataset.get_col_data(col_name), return_index=True)
 
     # 为动作和其他低维状态列分别建立零均值、单位方差的处理器。
     process = {}
@@ -105,7 +111,9 @@ def run(cfg: DictConfig):
 
     if policy != "random":
         # 加载冻结的预训练世界模型，并据此构建规划求解器和策略。
-        model = swm.wm.utils.load_pretrained(cfg.policy)
+        model = swm.wm.utils.load_pretrained(
+            cfg.policy, cache_dir=cfg.cache_dir
+        )
         model = model.to("cuda")
         model = model.eval()
         model.requires_grad_(False)
@@ -122,47 +130,25 @@ def run(cfg: DictConfig):
 
     # 学习策略的结果写到模型缓存目录旁；随机基线写到当前脚本目录。
     results_path = (
-        Path(swm.data.utils.get_cache_dir(), cfg.policy).parent
+        Path(
+            swm.data.utils.get_cache_dir(
+                cfg.cache_dir, sub_folder="checkpoints"
+            ),
+            cfg.policy,
+        ).parent
         if cfg.policy != "random"
         else Path(__file__).parent
     )
 
     # sample the episodes and the starting indices
-    # 只保留仍有足够后续步数可到达目标的起点。
-    episode_len = get_episodes_length(dataset, ep_indices)
-    max_start_idx = episode_len - cfg.eval.goal_offset_steps - 1
-    max_start_idx_dict = {ep_id: max_start_idx[i] for i, ep_id in enumerate(ep_indices)}
-    # Map each dataset row’s episode_idx to its max_start_idx
-    # 将“每回合最大起点”映射到该回合的每一条数据行。
-    col_name = "episode_idx" if "episode_idx" in dataset.column_names else "ep_idx"
-    max_start_per_row = np.array(
-        [max_start_idx_dict[ep_id] for ep_id in dataset.get_col_data(col_name)]
+    # 直接依据每回合长度构造有效起点，避免依赖格式特有的索引列。
+    eval_episodes, eval_start_idx = sample_eval_starts(
+        episode_lengths=dataset.lengths,
+        goal_offset_steps=cfg.eval.goal_offset_steps,
+        num_eval=cfg.eval.num_eval,
+        seed=cfg.seed,
     )
-
-    # remove all the lines of dataset for which dataset['step_idx'] > max_start_per_row
-    # 排除起点过晚、无法提供所需目标偏移量的样本。
-    valid_mask = dataset.get_col_data("step_idx") <= max_start_per_row
-    valid_indices = np.nonzero(valid_mask)[0]
-    print(valid_mask.sum(), "valid starting points found for evaluation.")
-
-    # 使用固定种子的随机数生成器，确保评估起点可复现。
-    g = np.random.default_rng(cfg.seed)
-    random_episode_indices = g.choice(
-        len(valid_indices) - 1, size=cfg.eval.num_eval, replace=False
-    )
-
-    # sort increasingly to avoid issues with HDF5Dataset indexing
-    # 排序后的索引满足 HDF5 数据集的批量索引约束。
-    random_episode_indices = np.sort(valid_indices[random_episode_indices])
-
-    print(random_episode_indices)
-
-    # 根据抽样行恢复每次评估所处的回合编号和起始步骤。
-    eval_episodes = dataset.get_row_data(random_episode_indices)[col_name]
-    eval_start_idx = dataset.get_row_data(random_episode_indices)["step_idx"]
-
-    if len(eval_episodes) < cfg.eval.num_eval:
-        raise ValueError("Not enough episodes with sufficient length for evaluation.")
+    print(len(eval_episodes), "starting points sampled for evaluation.")
 
     # 将选定策略装入环境，随后开始实际评估。
     world.set_policy(policy)

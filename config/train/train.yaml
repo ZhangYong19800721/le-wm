@@ -1,18 +1,18 @@
 defaults:
   - _self_
-  - launcher: local
-  - data: pusht
-  - model: lewm
+  - launcher: local  # 启动器配置文件
+  - data: pusht  # 数据集配置文件
+  - model: lewm  # 模型配置文件
 
 output_model_name: lewm_pusht
 subdir: ${hydra:job.id}
 
-num_workers: 6
-train_split: 0.9
-seed: 3072
-img_size: 224
-embed_dim: 192
-history_size: 3
+num_workers: 6  # 数据加载器的工作线程数
+train_split: 0.9  # 按比例分割训练集和验证集
+seed: 3072  # 随机数种子
+img_size: 224  # 图像大小 img_size * img_size
+embed_dim: 192  # 隐空间的维度，图像经过 ecoder + projector 后的输出维度
+history_size: 3  # 历史步数
 
 trainer:
   max_epochs: 100
@@ -33,7 +33,7 @@ optimizer:
   lr: 5e-5
   weight_decay: 1e-3
 
-num_preds: 1
+num_preds: 1  # 预测步数
 
 loss:
   sigreg:

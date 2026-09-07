@@ -6,7 +6,7 @@ from pathlib import Path
 # 训练框架、配置系统和项目依赖。
 import hydra
 import lightning as pl
-import stable_pretraining as spt
+import stable_pretraining as spt  # Registers OmegaConf's eval resolver.
 import stable_worldmodel as swm
 import torch
 from lightning.pytorch.loggers import WandbLogger
@@ -53,7 +53,7 @@ def lejepa_forward(self, batch, stage, cfg):
     self.log_dict(losses_dict, on_step=True, sync_dist=True)
     return output
 
-@hydra.main(version_base=None, config_path="./config/train", config_name="lewm")
+@hydra.main(version_base=None, config_path="./config/train", config_name="train")
 def run(cfg):
     #########################
     ##       dataset       ##

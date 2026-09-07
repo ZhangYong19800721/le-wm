@@ -1,18 +1,18 @@
 defaults:
   - _self_
-  - launcher: local  # Æô¶¯Æ÷ÅäÖÃÎÄ¼ş
-  - data: pusht  # Êı¾İ¼¯ÅäÖÃÎÄ¼ş
-  - model: lewm  # Ä£ĞÍÅäÖÃÎÄ¼ş
+  - launcher: local  # å¯åŠ¨å™¨é…ç½®æ–‡ä»¶
+  - data: pusht  # æ•°æ®é›†é…ç½®æ–‡ä»¶
+  - model: lewm  # æ¨¡å‹é…ç½®æ–‡ä»¶
 
 output_model_name: lewm_pusht
 subdir: ${hydra:job.id}
 
-num_workers: 6  # Êı¾İ¼ÓÔØÆ÷µÄ¹¤×÷Ïß³ÌÊı
-train_split: 0.9  # °´±ÈÀı·Ö¸îÑµÁ·¼¯ºÍÑéÖ¤¼¯
-seed: 3072  # Ëæ»úÊıÖÖ×Ó
-img_size: 224  # Í¼Ïñ´óĞ¡ img_size * img_size
-embed_dim: 192  # Òş¿Õ¼äµÄÎ¬¶È£¬Í¼Ïñ¾­¹ı ecoder + projector ºóµÄÊä³öÎ¬¶È
-history_size: 3  # ÀúÊ·²½Êı
+num_workers: 6  # æ•°æ®åŠ è½½å™¨çš„å·¥ä½œçº¿ç¨‹æ•°
+train_split: 0.9  # æŒ‰æ¯”ä¾‹åˆ†å‰²è®­ç»ƒé›†å’ŒéªŒè¯é›†
+seed: 3072  # éšæœºæ•°ç§å­
+img_size: 224  # å›¾åƒå¤§å° img_size * img_size
+embed_dim: 192  # éšç©ºé—´çš„ç»´åº¦ï¼Œå›¾åƒç»è¿‡ ecoder + projector åçš„è¾“å‡ºç»´åº¦
+history_size: 3  # å†å²æ­¥æ•°
 
 trainer:
   max_epochs: 100
@@ -33,7 +33,7 @@ optimizer:
   lr: 5e-5
   weight_decay: 1e-3
 
-num_preds: 1  # Ô¤²â²½Êı
+num_preds: 1  # é¢„æµ‹æ­¥æ•°
 
 loss:
   sigreg:

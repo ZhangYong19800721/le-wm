@@ -71,6 +71,7 @@ def run(cfg):
     transforms = [get_img_preprocessor(source='pixels', target='pixels', img_size=cfg.img_size)]
     
     with open_dict(cfg):
+        # open_dict 作用是允许临时改变配置中的某个参数，例如有些参数需要根据其他参数计算出来的情况
         # 为每个非图像数值列拟合独立的 z-score 标准化变换。
         for col in cfg.data.dataset.keys_to_load:
             if col.startswith("pixels"):

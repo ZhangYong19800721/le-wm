@@ -16,6 +16,24 @@ from module import SIGReg
 from utils import get_column_normalizer, get_img_preprocessor, SaveCkptCallback
 
 
+def gather_for_sigreg(x):
+    """Gather batch embeddings across DDP ranks when shapes are compatible."""
+    if not torch.distributed.is_available() or not torch.distributed.is_initialized():
+        return x
+
+    world_size = torch.distributed.get_world_size()
+    local_batch = torch.tensor([x.size(0)], device=x.device)
+    batch_sizes = [torch.zeros_like(local_batch) for _ in range(world_size)]
+    torch.distributed.all_gather(batch_sizes, local_batch)
+
+    if len({int(size.item()) for size in batch_sizes}) != 1:
+        return x
+
+    from torch.distributed.nn.functional import all_gather
+
+    return torch.cat(all_gather(x.contiguous()), dim=0)
+
+
 def lejepa_forward(self, batch, stage, cfg):
     """encode observations, predict next states, compute losses."""
 
@@ -45,7 +63,8 @@ def lejepa_forward(self, batch, stage, cfg):
     # LeWM loss
     # 总损失由潜在空间预测误差和高斯分布正则项加权组成。
     output["pred_loss"] = (pred_emb - tgt_emb).pow(2).mean()
-    output["sigreg_loss"]= self.sigreg(emb.transpose(0, 1))
+    sigreg_emb = gather_for_sigreg(emb)
+    output["sigreg_loss"]= self.sigreg(sigreg_emb.transpose(0, 1))
     output["loss"] = output["pred_loss"] + lambd * output["sigreg_loss"]  
 
     # 仅记录损失项，并在分布式训练进程之间同步日志。
@@ -76,7 +95,18 @@ def run(cfg):
         for col in cfg.data.dataset.keys_to_load:
             if col.startswith("pixels"):
                 continue
-            normalizer = get_column_normalizer(dataset, col, col)
+            normalizer_cache_dir = swm.data.utils.get_cache_dir(sub_folder="normalizers")
+            normalizer_cache_key = (
+                f"{dataset_name}_steps{dataset_cfg.get('num_steps')}"
+                f"_frameskip{dataset_cfg.get('frameskip')}"
+            )
+            normalizer = get_column_normalizer(
+                dataset,
+                col,
+                col,
+                cache_dir=normalizer_cache_dir,
+                cache_key=normalizer_cache_key,
+            )
             transforms.append(normalizer)
 
         # frameskip 会拼接多个动作，因此动作编码器输入宽度需同步放大。
@@ -147,10 +177,11 @@ def run(cfg):
     )
 
     # Lightning Trainer 负责设备、分布式执行、日志与训练循环。
+    trainer_kwargs = OmegaConf.to_container(cfg.trainer, resolve=True)
+    trainer_kwargs.setdefault("num_sanity_val_steps", 1)
     trainer = pl.Trainer(
-        **cfg.trainer,
+        **trainer_kwargs,
         callbacks=[object_dump_callback],
-        num_sanity_val_steps=1,
         logger=logger,
         enable_checkpointing=True,
     )

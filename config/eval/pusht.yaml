@@ -16,7 +16,7 @@ dataset:
     - state
 
 seed: 42
-policy: lewm_pusht/weights_epoch_2.pt  # random # ckpt name or random
+policy: lewm_pusht/weights_epoch_3.pt  # random # ckpt name or random
 
 plan_config:
   horizon: 10

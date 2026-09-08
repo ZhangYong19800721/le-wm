@@ -15,8 +15,8 @@ dataset:
     - proprio
     - state
 
-seed: 42
-policy: lewm_pusht/weights_epoch_4.pt  # random # ckpt name or random
+seed: 45
+policy: lewm_pusht/weights_epoch_18.pt  # random # ckpt name or random
 
 plan_config:
   horizon: 10
@@ -26,8 +26,8 @@ plan_config:
 # evaluation from dataset (replay expert trajectories)
 eval:
   num_eval: 5
-  goal_offset_steps: 230
-  eval_budget: 330
+  goal_offset_steps: 220
+  eval_budget: 320
   img_size: 224
   dataset_name: pusht_expert_train.lance
   callables:

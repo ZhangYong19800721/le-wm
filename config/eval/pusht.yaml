@@ -15,11 +15,11 @@ dataset:
     - proprio
     - state
 
-seed: 45
-policy: lewm_pusht/weights_epoch_18.pt  # random # ckpt name or random
+seed: 48
+policy: lewm_pusht/weights_epoch_35.pt  # random # ckpt name or random
 
 plan_config:
-  horizon: 10
+  horizon: 5
   receding_horizon: 5
   action_block: 5 # frameskip
 

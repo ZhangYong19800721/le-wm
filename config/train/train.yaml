@@ -1,37 +1,31 @@
 defaults:
   - _self_
-  - launcher: local  # 启动器配置文件
-  - data: pusht  # 数据集配置文件
-  - model: lewm  # 模型配置文件
+  - launcher: local
+  - data: pusht
+  - model: lewm
 
 output_model_name: lewm_pusht
 subdir: ${hydra:job.id}
 
-num_workers: 2  # 每个 DDP 进程的数据加载器工作线程数；4 卡时总计 8 个 worker
-train_split: 0.9  # 按比例分割训练集和验证集
-seed: 3072  # 随机数种子
-img_size: 224  # 图像大小 img_size * img_size
-embed_dim: 192  # 隐空间的维度，图像经过 ecoder + projector 后的输出维度
-history_size: 3  # 历史步数
+num_workers: 6
+train_split: 0.9
+seed: 3072
+img_size: 224
+embed_dim: 192
+history_size: 3
 
 trainer:
-  max_epochs: 100
+  max_epochs: 10
+  devices: 1
   accelerator: gpu
-  devices: 4
-  num_nodes: 1
-  strategy: ddp
-  precision: 16-mixed
+  precision: bf16
   gradient_clip_val: 1.0
-  use_distributed_sampler: True
-  num_sanity_val_steps: 1
-  limit_train_batches: 1.0
-  limit_val_batches: 1.0
 
 loader:
-  batch_size: 80  # DDP 下这是每卡 batch；4 卡总 batch 仍为 64
+  batch_size: 128
   num_workers: ${num_workers}
   persistent_workers: True
-  prefetch_factor: 2
+  prefetch_factor: 3
   pin_memory: True
 
 optimizer:
@@ -39,7 +33,7 @@ optimizer:
   lr: 5e-5
   weight_decay: 1e-3
 
-num_preds: 1  # 预测步数
+num_preds: 1
 
 loss:
   sigreg:
